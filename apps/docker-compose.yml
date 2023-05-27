@@ -1,0 +1,51 @@
+version: "3.8"
+services:
+  api:
+    build:
+      context: ../expresso-typeorm
+      dockerfile: ./Dockerfile
+    container_name: expresso_api
+    labels:
+      - "traefik.http.routers.api.rule=Host(`api.app.localhost`)"
+    restart: always
+    ports:
+      - "8001:8000"
+    depends_on: 
+      - reverse-proxy
+    networks:
+      - expresso-network
+
+  app:
+    build:
+      context: ../nextine-admin
+      dockerfile: ./Dockerfile
+    container_name: mantine_app
+    labels:
+      - "traefik.http.routers.app.rule=Host(`app.localhost`)"
+    restart: always
+    ports:
+      - "8002:3000"
+    depends_on: 
+      - reverse-proxy
+    networks:
+      - expresso-network
+  
+  reverse-proxy:
+    # The official v2 Traefik docker image
+    image: traefik:v2.10
+    # Enables the web UI and tells Traefik to listen to docker
+    command: --api.insecure=true --providers.docker
+    ports:
+      # The HTTP port
+      - "80:80"
+      # The Web UI (enabled by --api.insecure=true)
+      - "8080:8080"
+    volumes:
+      # So that Traefik can listen to the Docker events
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - expresso-network
+
+networks:
+  expresso-network:
+    driver: bridge

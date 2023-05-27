@@ -1,0 +1,120 @@
+version: "3.8"
+
+services:
+  minio:
+    container_name: minio
+    # Please use fixed versions :D
+    image: quay.io/minio/minio:RELEASE.2023-05-18T00-05-36Z
+    command: server /data --console-address ":9001"
+    volumes:
+      - ../storage/minio-data:/mnt/data:/data
+    # ports:
+    #   - '9000:9000'
+    #   - '9001:9001'
+    environment:
+      - MINIO_ROOT_USER=${MINIO_USERNAME}
+      - MINIO_ROOT_PASSWORD=${MINIO_PASSWORD}
+      - MINIO_DOMAIN=minio.localhost
+      - MINIO_SERVER_URL=http://minio.localhost
+
+      # All Routing is done by Traefik, just tell minio where to redirect to.
+      - MINIO_BROWSER_REDIRECT_URL=http://minio-console.localhost
+    restart: always
+    networks:
+      - traefik-network
+    depends_on:
+      - traefik-proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-network"
+      - "traefik.constraint-label=traefik-network"
+      # S3
+      - "traefik.http.routers.minio.service=minio"
+      - "traefik.http.routers.minio.entrypoints=web"
+      - "traefik.http.routers.minio.rule=Host(`minio.localhost`)"
+      - "traefik.http.services.minio.loadbalancer.server.port=9000"
+      # Console
+      - "traefik.http.routers.minio-console.service=minio-console"
+      - "traefik.http.routers.minio-console.entrypoints=web"
+      - "traefik.http.routers.minio-console.rule=Host(`minio-console.localhost`)"
+      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+
+  whoami:
+    image: "containous/whoami"
+    container_name: whoami
+    restart: always
+    networks:
+      - traefik-network
+    depends_on:
+      - traefik-proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.whoami.service=whoami"
+      - "traefik.http.routers.whoami.entrypoints=web"
+      - "traefik.http.routers.whoami.rule=Host(`whoami.localhost`)"
+      - "traefik.http.services.whoami.loadbalancer.server.port=80"
+
+  ghost:
+    image: ghost:5-alpine
+    container_name: ghost
+    restart: always
+    ports:
+      - 2368:2368
+    environment:
+      # see https://ghost.org/docs/config/#configuration-options
+      - "database__client=mysql"
+      - "database__connection__host=192.168.4.26"
+      - "database__connection__port=3306"
+      - "database__connection__user=root"
+      - "database__connection__password=padang123"
+      - "database__connection__database=ghost"
+      # this url value is just an example, and is likely wrong for your environment!
+      - url=http://ghost.localhost
+      # contrary to the default mentioned in the linked documentation, this image defaults to NODE_ENV=production (so development mode needs to be explicitly specified if desired)
+      #NODE_ENV: development
+    volumes:
+      - ../storage/ghost-data:/var/lib/ghost/content
+    networks:
+      - traefik-network
+    depends_on:
+      - traefik-proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.ghost.service=ghost"
+      - "traefik.http.routers.ghost.entrypoints=web"
+      - "traefik.http.routers.ghost.rule=Host(`ghost.localhost`)"
+      - "traefik.http.services.ghost.loadbalancer.server.port=2368"
+
+  traefik-proxy:
+    # The official v2 Traefik docker image
+    image: traefik:v2.10
+    # Enables the web UI and tells Traefik to listen to docker
+    command:
+      - --api.insecure=true
+      - --providers.docker
+      - --entryPoints.web.address=:80
+      - --log.level=DEBUG
+    ports:
+      # The HTTP port
+      - "80:80"
+      # The Web UI (enabled by --api.insecure=true)
+      - "8080:8080"
+    volumes:
+      # So that Traefik can listen to the Docker events
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - traefik-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.service=traefik"
+      - "traefik.http.routers.traefik.entrypoints=web"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+
+volumes:
+  storage:
+
+
+networks:
+  traefik-network:
+    external: true
