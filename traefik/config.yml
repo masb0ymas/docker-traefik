@@ -1,0 +1,20 @@
+http:
+  routers:
+    traefik:
+      rule: "Host(`traefik.localhost`)"
+      service: "api@internal"
+      tls:
+        domains:
+          - main: "localhost"
+            sans:
+              - "*.localhost"
+          - main: "domain.local"
+            sans:
+              - "*.domain.local"
+
+tls:
+  certificates:
+    - certFile: "/etc/certs/local-cert.pem"
+      keyFile: "/etc/certs/local-key.pem"
+      stores:
+        - default

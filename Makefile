@@ -5,10 +5,10 @@ DOCKER_COMPOSE_DOWN = docker-compose.yml down
 network.traefik:
 	docker network create traefik-network
 
-.PHONY: docker.minio.up
-docker.minio.up:
-	docker compose -f minio/${DOCKER_COMPOSE_UP}
+.PHONY: docker-traefik.up
+docker-traefik.up:
+	docker compose -f ${DOCKER_COMPOSE_UP}
 
-.PHONY: docker.minio.down
-docker.minio.down:
-	docker compose -f minio/${DOCKER_COMPOSE_DOWN}
+.PHONY: docker-traefik.down
+docker-traefik.down:
+	docker compose -f ${DOCKER_COMPOSE_DOWN}
