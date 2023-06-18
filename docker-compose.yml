@@ -1,130 +1,57 @@
-version: "3.8"
+version: '3.8'
 
 services:
-  minio:
-    container_name: traefik-minio
-    image: quay.io/minio/minio:RELEASE.2023-05-18T00-05-36Z
-    command: server /data --console-address ":9001"
-    volumes:
-      - ./storage/minio-data:/minio/data:/data
-    ports:
-      - '9000:9000'
-      - '9001:9001'
-    environment:
-      - MINIO_SITE_REGION=${MINIO_SITE_REGION}
-      - MINIO_ROOT_USER=${MINIO_USERNAME}
-      - MINIO_ROOT_PASSWORD=${MINIO_PASSWORD}
-      # URL Site
-      - MINIO_DOMAIN=${MINIO_SERVER_URL}
-      - MINIO_SERVER_URL=https://${MINIO_SERVER_URL}
-      - MINIO_BROWSER_REDIRECT_URL=https://${MINIO_BROWSER_REDIRECT_URL}
-    restart: always
-    networks:
-      - traefik-network
-    depends_on:
-      - traefik-proxy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=traefik-network"
-      - "traefik.constraint-label=traefik-network"
-      # S3
-      - "traefik.http.routers.minio.service=minio"
-      - "traefik.http.routers.minio.entrypoints=websecure"
-      - "traefik.http.routers.minio.rule=Host(`${MINIO_SERVER_URL}`)"
-      - "traefik.http.routers.minio.tls=true"
-      - "traefik.http.services.minio.loadbalancer.server.port=9000"
-      # Console
-      - "traefik.http.routers.minio-console.service=minio-console"
-      - "traefik.http.routers.minio-console.entrypoints=websecure"
-      - "traefik.http.routers.minio-console.rule=Host(`${MINIO_BROWSER_REDIRECT_URL}`)"
-      - "traefik.http.routers.minio-console.tls=true"
-      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
-
-  whoami:
-    image: "containous/whoami"
-    container_name: traefik-whoami
-    restart: always
-    networks:
-      - traefik-network
-    depends_on:
-      - traefik-proxy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=traefik-network"
-      # Proxy
-      - "traefik.http.routers.whoami.service=whoami"
-      - "traefik.http.routers.whoami.entrypoints=websecure"
-      - "traefik.http.routers.whoami.rule=Host(`whoami.localhost`)"
-      - "traefik.http.routers.whoami.tls=true"
-      - "traefik.http.services.whoami.loadbalancer.server.port=80"
-
-  ghost:
-    image: ghost:5-alpine
-    container_name: traefik-ghost
-    restart: always
-    ports:
-      - 2368:2368
-    environment:
-      # see https://ghost.org/docs/config/#configuration-options
-      - "database__client=mysql"
-      - "database__connection__host=${GHOST_HOST}"
-      - "database__connection__port=${GHOST_PORT}"
-      - "database__connection__user=${GHOST_USERNAME}"
-      - "database__connection__password=${GHOST_PASSWORD}"
-      - "database__connection__database=${GHOST_DATABASE}"
-      # this url value is just an example, and is likely wrong for your environment!
-      - url=https://${GHOST_SITE_URL}
-      # contrary to the default mentioned in the linked documentation, this image defaults to NODE_ENV=production (so development mode needs to be explicitly specified if desired)
-      #NODE_ENV: development
-    volumes:
-      - ./storage/ghost-data:/var/lib/ghost/content
-    networks:
-      - traefik-network
-    depends_on:
-      - traefik-proxy
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=traefik-network"
-      # Proxy
-      - "traefik.http.routers.ghost.service=ghost"
-      - "traefik.http.routers.ghost.entrypoints=websecure"
-      - "traefik.http.routers.ghost.rule=Host(`${GHOST_SITE_URL}`)"
-      - "traefik.http.routers.ghost.tls=true"
-      - "traefik.http.services.ghost.loadbalancer.server.port=2368"
-
-  traefik-proxy:
-    # The official v2 Traefik docker image
+  traefik:
     image: traefik:v2.10
+    container_name: traefik-proxy
     restart: unless-stopped
-    # Enables the web UI and tells Traefik to listen to docker
-    command:
-      - --api.insecure=true
-      - --providers.docker
-      - --log.level=DEBUG
-      - --entryPoints.web.address=:80
-      - --entryPoints.websecure.address=:443
-    ports:
-      # The HTTP port
-      - "80:80"
-      - "443:443"
-      # The Web UI (enabled by --api.insecure=true)
-      - "8080:8080"
-    volumes:
-      # So that Traefik can listen to the Docker events
-      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
-      - ./traefik/config.yml:/etc/traefik/config.yml:ro
-      - ./certs:/etc/certs:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+    security_opt:
+      - "no-new-privileges:true"
     networks:
-      - traefik-network
+      - proxy
+    ports:
+      - "80:80" # http
+      - "443:443" # https
+    volumes:
+      - "/etc/localtime:/etc/localtime:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./config/traefik.yml:/traefik.yml:ro"
+      - "./config/acme.json:/acme.json"
+      - "./config:/config"
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.traefik=true"
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      # Proxy
+      - traefik.http.routers.traefik-ui.entrypoints=websecure
+      - traefik.http.routers.traefik-ui.rule=Host(`${TRAEFIK_URL}`)
+      - traefik.http.routers.traefik-ui.service=api@internal
+      - traefik.http.routers.traefik-ui.middlewares=user-auth@file
+
+  portainer:
+    image: "portainer/portainer-ce:latest"
+    container_name: traefik-portainer
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    networks:
+      - proxy
+    volumes:
+      - "/etc/localtime:/etc/localtime:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./storage/portainer-data:/data"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      # Proxy
+      - traefik.http.routers.portainer-secure.entrypoints=websecure
+      - traefik.http.routers.portainer-secure.rule=Host(`${PORTAINER_URL}`)
+      - traefik.http.routers.portainer-secure.service=portainer
+      - traefik.http.services.portainer.loadbalancer.server.port=9000
 
 volumes:
   storage:
 
 
 networks:
-  traefik-network:
+  proxy:
     external: true

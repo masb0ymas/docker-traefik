@@ -3,12 +3,16 @@ DOCKER_COMPOSE_DOWN = docker-compose.yml down
 
 .PHONY: network.traefik
 network.traefik:
-	docker network create traefik-network
+	docker network create proxy
 
-.PHONY: docker-traefik.up
-docker-traefik.up:
+.PHONY: acme.permission
+acme.permission:
+	sudo chmod 600 ./config/acme.json
+
+.PHONY: docker.up
+docker.up:
 	docker compose -f ${DOCKER_COMPOSE_UP}
 
-.PHONY: docker-traefik.down
-docker-traefik.down:
+.PHONY: docker.down
+docker.down:
 	docker compose -f ${DOCKER_COMPOSE_DOWN}
