@@ -1,8 +1,8 @@
 DOCKER_COMPOSE_UP = docker-compose.yml up -d --build
 DOCKER_COMPOSE_DOWN = docker-compose.yml down
 
-.PHONY: network.traefik
-network.traefik:
+.PHONY: network.proxy
+network.proxy:
 	docker network create proxy
 
 .PHONY: acme.permission
