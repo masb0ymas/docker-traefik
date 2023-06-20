@@ -12,7 +12,6 @@ services:
     ports:
       - "80:80" # http
       - "443:443" # https
-      - "8080:8080" # dashboard ui
     volumes:
       - "/etc/localtime:/etc/localtime:ro"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
@@ -49,6 +48,25 @@ services:
       - traefik.http.routers.portainer-secure.rule=Host(`${PORTAINER_URL}`)
       - traefik.http.routers.portainer-secure.service=portainer
       - traefik.http.services.portainer.loadbalancer.server.port=9000
+
+  uptime:
+    image: louislam/uptime-kuma:1
+    container_name: traefik-uptime
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    networks:
+      - proxy
+    volumes:
+      - "./storage/uptimekuma-data:/app/data"
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      # Proxy
+      - traefik.http.routers.uptime-kuma-secure.entrypoints=websecure
+      - traefik.http.routers.uptime-kuma-secure.rule=Host(`${UPTIME_KUMA_URL}`)
+      - traefik.http.routers.uptime-kuma-secure.service=uptime-kuma
+      - traefik.http.services.uptime-kuma.loadbalancer.server.port=3001
 
   postgres:
     image: postgres
