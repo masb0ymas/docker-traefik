@@ -11,7 +11,7 @@ http:
     user-auth:
       basicAuth:
         users:
-          - "admin:$2y$10$G3dzk0ZBlZXBdHdxj7ev8OHwTeUQKSyGL53XCPy5K3EMUpLN2ot5K"
+          - "admin:$2y$10$pWij3ooPsrOieZs7SkIBw.sOwM/r90DqMI3nli6XGMSt799.v15zq"
 
 tls:
   options:
