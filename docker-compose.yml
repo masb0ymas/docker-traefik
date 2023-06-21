@@ -68,6 +68,39 @@ services:
       - traefik.http.routers.uptime-kuma-secure.service=uptime-kuma
       - traefik.http.services.uptime-kuma.loadbalancer.server.port=3001
 
+  minio:
+    container_name: traefik-minio
+    image: quay.io/minio/minio:RELEASE.2023-06-19T19-52-50Z
+    command: server /data --address ":9090" --console-address ":9091"
+    restart: unless-stopped
+    security_opt:
+      - "no-new-privileges:true"
+    environment:
+      - MINIO_SITE_REGION=${MINIO_SITE_REGION}
+      - MINIO_ROOT_USER=${MINIO_USERNAME}
+      - MINIO_ROOT_PASSWORD=${MINIO_PASSWORD}
+      # URL Site
+      - MINIO_DOMAIN=${MINIO_SERVER_URL}
+      - MINIO_SERVER_URL=https://${MINIO_SERVER_URL}
+      - MINIO_BROWSER_REDIRECT_URL=https://${MINIO_BROWSER_REDIRECT_URL}
+    networks:
+      - proxy
+    volumes:
+      - ./storage/minio-data:/data
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      # S3
+      - traefik.http.routers.minio-s3-secure.entrypoints=websecure
+      - traefik.http.routers.minio-s3-secure.rule=Host(`${MINIO_SERVER_URL}`)
+      - traefik.http.routers.minio-s3-secure.service=minio-s3
+      - traefik.http.services.minio-s3.loadbalancer.server.port=9090
+      # Console
+      - traefik.http.routers.minio-console-secure.entrypoints=websecure
+      - traefik.http.routers.minio-console-secure.rule=Host(`${MINIO_BROWSER_REDIRECT_URL}`)
+      - traefik.http.routers.minio-console-secure.service=minio-console
+      - traefik.http.services.minio-console.loadbalancer.server.port=9091
+
   postgres:
     image: postgres
     container_name: traefik-postgres
