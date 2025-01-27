@@ -1,0 +1,92 @@
+services:
+  # Traefik Reverse Proxy
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - "/etc/localtime:/etc/localtime:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./config/traefik.yml:/etc/traefik/traefik.yml:ro"
+      - "./config/acme.json:/acme.json"
+      - "./config:/config"
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.traefik.rule=Host(`${TRAEFIK_URL}`)"
+      - "traefik.http.routers.traefik.service=api@internal"
+      - "traefik.http.routers.traefik.entrypoints=websecure"
+      - "traefik.http.routers.traefik.middlewares=user-auth@file"
+      - "traefik.http.services.traefik-ui.loadbalancer.server.port=8080"
+
+  # PostgreSQL Database
+  postgresql:
+    image: postgres:15-alpine
+    container_name: traefik-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    networks:
+      - proxy
+    volumes:
+      - ./postgresql:/var/lib/postgresql/data
+    environment:
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_USER=${DB_USERNAME}
+      - POSTGRES_DB=${DB_DATABASE}
+
+  # Redis Cache
+  redis:
+    image: redis:alpine
+    container_name: traefik-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    networks:
+      - proxy
+
+  # Dozzle Log Viewer
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: traefik-logger
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.dozzle.rule=Host(`${DOZZLE_URL}`)"
+      - "traefik.http.routers.dozzle.entrypoints=websecure"
+      - "traefik.http.routers.dozzle.service=dozzle"
+      - "traefik.http.services.dozzle.loadbalancer.server.port=8080"
+
+  # Portainer Docker Management
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: traefik-portainer
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./portainer/data:/data
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.portainer.rule=Host(`${PORTAINER_URL}`)"
+      - "traefik.http.routers.portainer.entrypoints=websecure"
+      - "traefik.http.routers.portainer.service=portainer"
+      - "traefik.http.services.portainer.loadbalancer.server.port=9000"
+
+volumes:
+  storage:
+
+networks:
+  proxy:
+    external: true

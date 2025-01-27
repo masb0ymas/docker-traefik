@@ -1,0 +1,21 @@
+services:
+  api-staging:
+    image: your_image:v0.0.1
+    container_name: api-staging
+    restart: always
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.api-staging.rule=Host(`${API_STAGING_URL}`)"
+      - "traefik.http.routers.api-staging.entrypoints=websecure"
+      - "traefik.http.routers.api-staging.service=api-staging"
+      - "traefik.http.services.api-staging.loadbalancer.server.port=8000"
+
+volumes:
+  storage:
+
+networks:
+  proxy:
+    external: true
